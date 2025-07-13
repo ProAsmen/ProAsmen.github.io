@@ -32,9 +32,10 @@
 <input id="search_asset_number" placeholder="Filter Asset Number..." onkeyup="filterTable()">
 <input id="search_date" type="date" onchange="filterTable()">
 
-<h4 id="count_display">Total catatan: 0 | Sesuai filter: 0</h4>
+<h4 id="count_display">Total catatan: 0 | Sesuai filter: 0
+  <button onclick="clearAllData()" style="background-color:#e74c3c; color:white; padding:4px 8px; font-size:12px; margin-left:10px;">Hapus Semua Data</button>
+</h4>
 
-<h4>Data Preview</h4>
 <table id="preview_table">
   <thead>
     <tr>
@@ -187,6 +188,15 @@ function deleteData(index) {
     assetData.splice(index, 1);
     saveToLocal();
     renderTable();
+  }
+}
+
+function clearAllData() {
+  if (confirm('Yakin ingin menghapus semua data yang tersimpan?')) {
+    assetData = [];
+    saveToLocal();
+    renderTable();
+    alert('Semua data telah dihapus.');
   }
 }
 
