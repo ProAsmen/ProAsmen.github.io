@@ -14,7 +14,7 @@
 </head>
 <body>
 <h3>Form Pencatatan Asset</h3>
-<input id="asset_number" placeholder="Asset Number">
+<input id="asset_number" placeholder="Asset Number" type="number" inputmode="numeric">
 <input id="merk" placeholder="Merk">
 <input id="serial_number" placeholder="Serial Number">
 <input id="type" placeholder="Type">
@@ -47,23 +47,27 @@
 
 <script>
 let assetData = [];
+let gpsWatcherId = null;
 
-// Realtime GPS update setiap 2 detik
-function updateGPS() {
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      document.getElementById('latitude').value = position.coords.latitude;
-      document.getElementById('longitude').value = position.coords.longitude;
-    },
-    (error) => {
-      console.log('Gagal mendapatkan lokasi: ' + error.message);
-    },
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-  );
+// Start realtime GPS update akurasi tinggi
+function startGPSWatcher() {
+  if (navigator.geolocation) {
+    gpsWatcherId = navigator.geolocation.watchPosition(
+      (position) => {
+        document.getElementById('latitude').value = position.coords.latitude;
+        document.getElementById('longitude').value = position.coords.longitude;
+      },
+      (error) => {
+        console.log('Gagal mendapatkan lokasi: ' + error.message);
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: Infinity }
+    );
+  } else {
+    alert("Geolocation tidak didukung di perangkat ini.");
+  }
 }
-setInterval(updateGPS, 2000);
 
-// Ambil timestamp sekarang
+// Format timestamp
 function getCurrentTimestamp() {
   const now = new Date();
   return now.getFullYear() + "-" +
@@ -182,6 +186,11 @@ function importExcel(event) {
     renderTable();
   };
   reader.readAsArrayBuffer(file);
+}
+
+// Mulai GPS saat halaman dibuka
+window.onload = function() {
+  startGPSWatcher();
 }
 </script>
 </body>
