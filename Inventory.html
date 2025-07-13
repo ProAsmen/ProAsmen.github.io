@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pencatatan Asset - Save to Excel</title>
+<title>Pencatatan Asset - Auto Save Excel</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   body { font-family: sans-serif; padding: 10px; }
@@ -23,7 +23,7 @@
 <input id="latitude" placeholder="Latitude" readonly>
 <input id="longitude" placeholder="Longitude" readonly>
 <button onclick="addData()">Save & Preview</button>
-<button onclick="downloadExcel()">Download Excel</button>
+<button onclick="openAndShare()">Open & Share</button>
 <input type="file" id="file_input" accept=".xlsx" onchange="importExcel(event)">
 
 <h4>Data Preview</h4>
@@ -38,6 +38,7 @@
       <th>Location</th>
       <th>Latitude</th>
       <th>Longitude</th>
+      <th>Timestamp</th>
       <th>Action</th>
     </tr>
   </thead>
@@ -47,31 +48,63 @@
 <script>
 let assetData = [];
 
-navigator.geolocation.getCurrentPosition(
-  (position) => {
-    document.getElementById('latitude').value = position.coords.latitude;
-    document.getElementById('longitude').value = position.coords.longitude;
-  },
-  (error) => {
-    alert('Gagal mendapatkan lokasi: ' + error.message);
-  },
-  { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-);
+// Realtime GPS update
+function updateGPS() {
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      document.getElementById('latitude').value = position.coords.latitude;
+      document.getElementById('longitude').value = position.coords.longitude;
+    },
+    (error) => {
+      console.log('Gagal mendapatkan lokasi: ' + error.message);
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+}
+setInterval(updateGPS, 2000);
+
+function getCurrentTimestamp() {
+  const now = new Date();
+  return now.getFullYear() + "-" +
+    String(now.getMonth() + 1).padStart(2, '0') + "-" +
+    String(now.getDate()).padStart(2, '0') + " " +
+    String(now.getHours()).padStart(2, '0') + ":" +
+    String(now.getMinutes()).padStart(2, '0') + ":" +
+    String(now.getSeconds()).padStart(2, '0');
+}
 
 function addData() {
-  const asset_number = document.getElementById('asset_number').value;
-  const merk = document.getElementById('merk').value;
-  const serial_number = document.getElementById('serial_number').value;
-  const type = document.getElementById('type').value;
-  const capacity = document.getElementById('capacity').value;
-  const location = document.getElementById('location').value;
-  const latitude = document.getElementById('latitude').value;
-  const longitude = document.getElementById('longitude').value;
+  const asset_number = document.getElementById('asset_number').value.trim();
+  const merk = document.getElementById('merk').value.trim();
+  const serial_number = document.getElementById('serial_number').value.trim();
+  const type = document.getElementById('type').value.trim();
+  const capacity = document.getElementById('capacity').value.trim();
+  const location = document.getElementById('location').value.trim();
+  const latitude = document.getElementById('latitude').value.trim();
+  const longitude = document.getElementById('longitude').value.trim();
+  const timestamp = getCurrentTimestamp();
 
-  const record = { asset_number, merk, serial_number, type, capacity, location, latitude, longitude };
+  if (!asset_number) {
+    alert('Asset Number wajib diisi.');
+    return;
+  }
+
+  const existingIndex = assetData.findIndex(item => item.asset_number === asset_number);
+  if (existingIndex !== -1) {
+    if (!confirm('Asset Number sudah ada. Yakin ingin overwrite?')) {
+      return;
+    }
+    assetData.splice(existingIndex, 1);
+  }
+
+  const record = { asset_number, merk, serial_number, type, capacity, location, latitude, longitude, timestamp };
   assetData.push(record);
   renderTable();
+  autoSaveExcel();
+  clearForm();
+}
 
+function clearForm() {
   document.getElementById('asset_number').value = '';
   document.getElementById('merk').value = '';
   document.getElementById('serial_number').value = '';
@@ -94,6 +127,7 @@ function renderTable() {
       <td>${item.location}</td>
       <td>${item.latitude}</td>
       <td>${item.longitude}</td>
+      <td>${item.timestamp}</td>
       <td>
         <button onclick="editData(${index})">Edit</button>
         <button onclick="deleteData(${index})">Delete</button>
@@ -122,13 +156,29 @@ function deleteData(index) {
   if (confirm('Yakin ingin menghapus data ini?')) {
     assetData.splice(index, 1);
     renderTable();
+    autoSaveExcel();
   }
 }
 
-function downloadExcel() {
-  let filename = prompt("Masukkan nama file (tanpa .xlsx):", "asset_data");
-  if (!filename) filename = "asset_data";
+function autoSaveExcel() {
+  let filename = localStorage.getItem('filename');
+  if (!filename) {
+    filename = prompt("Masukkan nama file untuk menyimpan data (tanpa .xlsx):", "asset_data");
+    if (!filename) filename = "asset_data";
+    localStorage.setItem('filename', filename);
+  }
+  const worksheet = XLSX.utils.json_to_sheet(assetData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'AssetData');
+  XLSX.writeFile(workbook, filename + '.xlsx');
+}
 
+function openAndShare() {
+  let filename = localStorage.getItem('filename');
+  if (!filename) {
+    alert("Belum ada file yang dibuat.");
+    return;
+  }
   const worksheet = XLSX.utils.json_to_sheet(assetData);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'AssetData');
@@ -146,6 +196,7 @@ function importExcel(event) {
     const importedData = XLSX.utils.sheet_to_json(worksheet);
     assetData = assetData.concat(importedData);
     renderTable();
+    autoSaveExcel();
   };
   reader.readAsArrayBuffer(file);
 }
