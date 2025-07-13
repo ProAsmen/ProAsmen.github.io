@@ -14,7 +14,7 @@
 </head>
 <body>
 <h3>Form Pencatatan Asset</h3>
-<input id="asset_number" placeholder="Asset Number" type="number" inputmode="numeric">
+<input id="asset_number" placeholder="Asset Number" type="number">
 <input id="merk" placeholder="Merk">
 <input id="serial_number" placeholder="Serial Number">
 <input id="type" placeholder="Type">
@@ -23,12 +23,13 @@
 <input id="latitude" placeholder="Latitude" readonly>
 <input id="longitude" placeholder="Longitude" readonly>
 <button onclick="addData()">Save & Preview</button>
-<button onclick="downloadExcel()">Download Excel</button>
-<input type="file" id="file_input" accept=".xlsx" onchange="importExcel(event)">
+<button onclick="downloadExcel()">Download</button>
 
 <h4>Filter Data</h4>
 <input id="search_asset_number" placeholder="Filter Asset Number..." onkeyup="filterTable()">
 <input id="search_date" type="date" onchange="filterTable()">
+
+<h4 id="count_display">Total catatan: 0 | Sesuai filter: 0</h4>
 
 <h4>Data Preview</h4>
 <table id="preview_table">
@@ -51,68 +52,51 @@
 
 <script>
 let assetData = [];
-let gpsWatcherId = null;
 
-// GPS realtime akurasi tinggi
-function startGPSWatcher() {
-  if (navigator.geolocation) {
-    gpsWatcherId = navigator.geolocation.watchPosition(
-      (position) => {
-        document.getElementById('latitude').value = position.coords.latitude;
-        document.getElementById('longitude').value = position.coords.longitude;
-      },
-      (error) => {
-        console.log('Gagal mendapatkan lokasi: ' + error.message);
-      },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: Infinity }
-    );
-  } else {
-    alert("Geolocation tidak didukung di perangkat ini.");
-  }
+function updateLocation() {
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      document.getElementById('latitude').value = position.coords.latitude.toFixed(6);
+      document.getElementById('longitude').value = position.coords.longitude.toFixed(6);
+    },
+    (error) => {
+      console.log('Gagal mendapatkan lokasi: ' + error.message);
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
 }
-
-// Timestamp rapi
-function getCurrentTimestamp() {
-  const now = new Date();
-  return now.getFullYear() + "-" +
-    String(now.getMonth() + 1).padStart(2, '0') + "-" +
-    String(now.getDate()).padStart(2, '0') + " " +
-    String(now.getHours()).padStart(2, '0') + ":" +
-    String(now.getMinutes()).padStart(2, '0') + ":" +
-    String(now.getSeconds()).padStart(2, '0');
-}
+setInterval(updateLocation, 3000);
+updateLocation();
 
 function addData() {
-  const asset_number = document.getElementById('asset_number').value.trim();
-  const merk = document.getElementById('merk').value.trim();
-  const serial_number = document.getElementById('serial_number').value.trim();
-  const type = document.getElementById('type').value.trim();
-  const capacity = document.getElementById('capacity').value.trim();
-  const location = document.getElementById('location').value.trim();
-  const latitude = document.getElementById('latitude').value.trim();
-  const longitude = document.getElementById('longitude').value.trim();
-  const timestamp = getCurrentTimestamp();
+  const asset_number = document.getElementById('asset_number').value;
+  const merk = document.getElementById('merk').value;
+  const serial_number = document.getElementById('serial_number').value;
+  const type = document.getElementById('type').value;
+  const capacity = document.getElementById('capacity').value;
+  const location = document.getElementById('location').value;
+  const latitude = document.getElementById('latitude').value;
+  const longitude = document.getElementById('longitude').value;
+  const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
   if (!asset_number) {
-    alert('Asset Number wajib diisi.');
+    alert('Asset Number harus diisi.');
     return;
   }
 
   const existingIndex = assetData.findIndex(item => item.asset_number === asset_number);
   if (existingIndex !== -1) {
-    if (!confirm('Asset Number sudah ada. Yakin ingin overwrite?')) {
+    if (!confirm("Asset Number sama sudah ada. Yakin ingin overwrite?")) {
       return;
+    } else {
+      assetData.splice(existingIndex, 1);
     }
-    assetData.splice(existingIndex, 1);
   }
 
   const record = { asset_number, merk, serial_number, type, capacity, location, latitude, longitude, timestamp };
   assetData.push(record);
   renderTable();
-  clearForm();
-}
 
-function clearForm() {
   document.getElementById('asset_number').value = '';
   document.getElementById('merk').value = '';
   document.getElementById('serial_number').value = '';
@@ -143,6 +127,8 @@ function renderTable() {
     `;
     table.appendChild(row);
   });
+  updateCountDisplay(assetData.length);
+  filterTable();
 }
 
 function editData(index) {
@@ -177,37 +163,32 @@ function downloadExcel() {
   XLSX.writeFile(workbook, filename + '.xlsx');
 }
 
-function importExcel(event) {
-  const file = event.target.files[0];
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: 'array' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const importedData = XLSX.utils.sheet_to_json(worksheet);
-    assetData = assetData.concat(importedData);
-    renderTable();
-  };
-  reader.readAsArrayBuffer(file);
+function updateCountDisplay(filteredCount) {
+  const totalCount = assetData.length;
+  document.getElementById('count_display').innerText =
+    `Total catatan: ${totalCount} | Sesuai filter: ${filteredCount}`;
 }
 
 function filterTable() {
   const assetFilter = document.getElementById('search_asset_number').value.trim().toLowerCase();
   const dateFilter = document.getElementById('search_date').value;
-
   const rows = document.querySelectorAll('#preview_table tbody tr');
+  let filteredCount = 0;
+
   rows.forEach(row => {
     const assetNumber = row.children[0].textContent.trim().toLowerCase();
     const timestamp = row.children[8].textContent.trim();
     const matchAsset = !assetFilter || assetNumber.includes(assetFilter);
     const matchDate = !dateFilter || timestamp.startsWith(dateFilter);
-    row.style.display = (matchAsset && matchDate) ? '' : 'none';
-  });
-}
 
-window.onload = function() {
-  startGPSWatcher();
+    if (matchAsset && matchDate) {
+      row.style.display = '';
+      filteredCount++;
+    } else {
+      row.style.display = 'none';
+    }
+  });
+  updateCountDisplay(filteredCount);
 }
 </script>
 </body>
