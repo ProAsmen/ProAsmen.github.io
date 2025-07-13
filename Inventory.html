@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pencatatan Asset - Auto Save Excel</title>
+<title>Pencatatan Asset - Save to Excel</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   body { font-family: sans-serif; padding: 10px; }
@@ -23,7 +23,7 @@
 <input id="latitude" placeholder="Latitude" readonly>
 <input id="longitude" placeholder="Longitude" readonly>
 <button onclick="addData()">Save & Preview</button>
-<button onclick="openAndShare()">Open & Share</button>
+<button onclick="downloadExcel()">Download Excel</button>
 <input type="file" id="file_input" accept=".xlsx" onchange="importExcel(event)">
 
 <h4>Data Preview</h4>
@@ -48,7 +48,7 @@
 <script>
 let assetData = [];
 
-// Realtime GPS update
+// Realtime GPS update setiap 2 detik
 function updateGPS() {
   navigator.geolocation.getCurrentPosition(
     (position) => {
@@ -63,6 +63,7 @@ function updateGPS() {
 }
 setInterval(updateGPS, 2000);
 
+// Ambil timestamp sekarang
 function getCurrentTimestamp() {
   const now = new Date();
   return now.getFullYear() + "-" +
@@ -100,7 +101,6 @@ function addData() {
   const record = { asset_number, merk, serial_number, type, capacity, location, latitude, longitude, timestamp };
   assetData.push(record);
   renderTable();
-  autoSaveExcel();
   clearForm();
 }
 
@@ -156,29 +156,13 @@ function deleteData(index) {
   if (confirm('Yakin ingin menghapus data ini?')) {
     assetData.splice(index, 1);
     renderTable();
-    autoSaveExcel();
   }
 }
 
-function autoSaveExcel() {
-  let filename = localStorage.getItem('filename');
-  if (!filename) {
-    filename = prompt("Masukkan nama file untuk menyimpan data (tanpa .xlsx):", "asset_data");
-    if (!filename) filename = "asset_data";
-    localStorage.setItem('filename', filename);
-  }
-  const worksheet = XLSX.utils.json_to_sheet(assetData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'AssetData');
-  XLSX.writeFile(workbook, filename + '.xlsx');
-}
+function downloadExcel() {
+  let filename = prompt("Masukkan nama file (tanpa .xlsx):", "asset_data");
+  if (!filename) filename = "asset_data";
 
-function openAndShare() {
-  let filename = localStorage.getItem('filename');
-  if (!filename) {
-    alert("Belum ada file yang dibuat.");
-    return;
-  }
   const worksheet = XLSX.utils.json_to_sheet(assetData);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'AssetData');
@@ -196,7 +180,6 @@ function importExcel(event) {
     const importedData = XLSX.utils.sheet_to_json(worksheet);
     assetData = assetData.concat(importedData);
     renderTable();
-    autoSaveExcel();
   };
   reader.readAsArrayBuffer(file);
 }
