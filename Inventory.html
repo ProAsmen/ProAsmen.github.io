@@ -26,6 +26,10 @@
 <button onclick="downloadExcel()">Download Excel</button>
 <input type="file" id="file_input" accept=".xlsx" onchange="importExcel(event)">
 
+<h4>Filter Data</h4>
+<input id="search_asset_number" placeholder="Filter Asset Number..." onkeyup="filterTable()">
+<input id="search_date" type="date" onchange="filterTable()">
+
 <h4>Data Preview</h4>
 <table id="preview_table">
   <thead>
@@ -49,7 +53,7 @@
 let assetData = [];
 let gpsWatcherId = null;
 
-// Start realtime GPS update akurasi tinggi
+// GPS realtime akurasi tinggi
 function startGPSWatcher() {
   if (navigator.geolocation) {
     gpsWatcherId = navigator.geolocation.watchPosition(
@@ -67,7 +71,7 @@ function startGPSWatcher() {
   }
 }
 
-// Format timestamp
+// Timestamp rapi
 function getCurrentTimestamp() {
   const now = new Date();
   return now.getFullYear() + "-" +
@@ -188,7 +192,20 @@ function importExcel(event) {
   reader.readAsArrayBuffer(file);
 }
 
-// Mulai GPS saat halaman dibuka
+function filterTable() {
+  const assetFilter = document.getElementById('search_asset_number').value.trim().toLowerCase();
+  const dateFilter = document.getElementById('search_date').value;
+
+  const rows = document.querySelectorAll('#preview_table tbody tr');
+  rows.forEach(row => {
+    const assetNumber = row.children[0].textContent.trim().toLowerCase();
+    const timestamp = row.children[8].textContent.trim();
+    const matchAsset = !assetFilter || assetNumber.includes(assetFilter);
+    const matchDate = !dateFilter || timestamp.startsWith(dateFilter);
+    row.style.display = (matchAsset && matchDate) ? '' : 'none';
+  });
+}
+
 window.onload = function() {
   startGPSWatcher();
 }
