@@ -10,6 +10,7 @@
   input, button { padding: 5px; margin: 5px; width: 90%; }
   table { border-collapse: collapse; width: 100%; margin-top: 10px; }
   td, th { border: 1px solid #ccc; padding: 5px; text-align: left; }
+  button { cursor: pointer; }
 </style>
 </head>
 <body>
@@ -130,6 +131,7 @@ function addData() {
   saveToLocal();
   renderTable();
 
+  // Reset form kecuali GPS
   document.getElementById('asset_number').value = '';
   document.getElementById('merk').value = '';
   document.getElementById('serial_number').value = '';
@@ -145,6 +147,7 @@ function saveToLocal() {
 function renderTable() {
   const table = document.getElementById('table_body');
   table.innerHTML = '';
+  
   assetData.forEach((item, index) => {
     const row = document.createElement('tr');
     row.innerHTML = `
@@ -159,13 +162,13 @@ function renderTable() {
       <td>${item.timestamp}</td>
       <td>
         <button onclick="editData(${index})">Edit</button>
-        <button onclick="deleteData(${index})">Delete</button>
+        <button onclick="deleteData(${index})" style="background-color:#e74c3c;color:white;">Delete</button>
       </td>
     `;
     table.appendChild(row);
   });
+  
   updateCountDisplay(assetData.length);
-  filterTable();
 }
 
 function editData(index) {
@@ -178,6 +181,7 @@ function editData(index) {
   document.getElementById('location').value = item.location;
   document.getElementById('latitude').value = item.latitude;
   document.getElementById('longitude').value = item.longitude;
+  
   assetData.splice(index, 1);
   saveToLocal();
   renderTable();
@@ -188,6 +192,7 @@ function deleteData(index) {
     assetData.splice(index, 1);
     saveToLocal();
     renderTable();
+    alert('Data berhasil dihapus.');
   }
 }
 
@@ -218,39 +223,71 @@ function importExcel(event) {
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     const importedData = XLSX.utils.sheet_to_json(worksheet);
-    assetData = assetData.concat(importedData);
+    
+    // Cek duplikat sebelum import
+    importedData.forEach(newItem => {
+      const existingIndex = assetData.findIndex(item => item.asset_number === newItem.asset_number);
+      if (existingIndex !== -1) {
+        if (confirm(`Asset Number ${newItem.asset_number} sudah ada. Overwrite?`)) {
+          assetData.splice(existingIndex, 1);
+        } else {
+          return; // Skip item ini
+        }
+      }
+      assetData.push(newItem);
+    });
+    
     saveToLocal();
     renderTable();
-    alert('Data berhasil diimpor dan disimpan.');
+    alert(`Berhasil mengimpor ${importedData.length} data.`);
+    document.getElementById('file_input').value = ''; // Reset input file
   };
   reader.readAsArrayBuffer(file);
 }
 
 function updateCountDisplay(filteredCount) {
   const totalCount = assetData.length;
-  document.getElementById('count_display').innerText =
-    `Total catatan: ${totalCount} | Sesuai filter: ${filteredCount}`;
+  document.getElementById('count_display').innerHTML =
+    `Total catatan: ${totalCount} | Sesuai filter: ${filteredCount}
+    <button onclick="clearAllData()" style="background-color:#e74c3c; color:white; padding:4px 8px; font-size:12px; margin-left:10px;">Hapus Semua Data</button>`;
 }
 
 function filterTable() {
   const assetFilter = document.getElementById('search_asset_number').value.trim().toLowerCase();
   const dateFilter = document.getElementById('search_date').value;
-  const rows = document.querySelectorAll('#preview_table tbody tr');
   let filteredCount = 0;
-
-  rows.forEach(row => {
-    const assetNumber = row.children[0].textContent.trim().toLowerCase();
-    const timestamp = row.children[8].textContent.trim();
+  
+  const tableBody = document.getElementById('table_body');
+  tableBody.innerHTML = '';
+  
+  assetData.forEach((item, index) => {
+    const assetNumber = item.asset_number.toString().toLowerCase();
+    const timestamp = item.timestamp;
     const matchAsset = !assetFilter || assetNumber.includes(assetFilter);
     const matchDate = !dateFilter || timestamp.startsWith(dateFilter);
 
     if (matchAsset && matchDate) {
-      row.style.display = '';
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${item.asset_number}</td>
+        <td>${item.merk}</td>
+        <td>${item.serial_number}</td>
+        <td>${item.type}</td>
+        <td>${item.capacity}</td>
+        <td>${item.location}</td>
+        <td>${item.latitude}</td>
+        <td>${item.longitude}</td>
+        <td>${item.timestamp}</td>
+        <td>
+          <button onclick="editData(${index})">Edit</button>
+          <button onclick="deleteData(${index})" style="background-color:#e74c3c;color:white;">Delete</button>
+        </td>
+      `;
+      tableBody.appendChild(row);
       filteredCount++;
-    } else {
-      row.style.display = 'none';
     }
   });
+  
   updateCountDisplay(filteredCount);
 }
 </script>
