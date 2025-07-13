@@ -21,7 +21,7 @@
 <input id="capacity" placeholder="Capacity">
 <input id="location" placeholder="Location">
 <input id="latitude" placeholder="Latitude" readonly>
-<input id="longitude" placeholder="Longitude" readonly">
+<input id="longitude" placeholder="Longitude" readonly>
 <br>
 <button onclick="addData()">Save & Preview</button>
 <button onclick="downloadExcel()">Download</button>
@@ -57,7 +57,17 @@
 let assetData = [];
 let gpsWatcher;
 
-// Inisialisasi GPS realtime
+// Load data dari LocalStorage saat pertama kali buka
+if (localStorage.getItem('assetData')) {
+  try {
+    assetData = JSON.parse(localStorage.getItem('assetData'));
+    renderTable();
+  } catch (e) {
+    console.error("Gagal memuat data dari LocalStorage", e);
+  }
+}
+
+// GPS Realtime stabil
 function startGPSWatcher() {
   if (gpsWatcher) navigator.geolocation.clearWatch(gpsWatcher);
   gpsWatcher = navigator.geolocation.watchPosition(
@@ -71,15 +81,13 @@ function startGPSWatcher() {
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
 }
-
-// Tombol refresh GPS manual
+startGPSWatcher();
 function refreshGPS() {
   startGPSWatcher();
-  alert("GPS telah diperbarui ulang.");
+  alert("GPS diperbarui ulang.");
 }
-startGPSWatcher();
 
-// Navigasi input antar kolom menggunakan panah kiri
+// Navigasi antar kolom dengan panah kiri
 const inputOrder = ['asset_number','merk','serial_number','type','capacity','location'];
 inputOrder.forEach((id, index) => {
   document.getElementById(id).addEventListener('keydown', (e) => {
@@ -103,7 +111,7 @@ function addData() {
   const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
   if (!asset_number) {
-    alert('Asset Number harus diisi.');
+    alert('Asset Number wajib diisi.');
     return;
   }
 
@@ -118,6 +126,7 @@ function addData() {
 
   const record = { asset_number, merk, serial_number, type, capacity, location, latitude, longitude, timestamp };
   assetData.push(record);
+  saveToLocal();
   renderTable();
 
   document.getElementById('asset_number').value = '';
@@ -126,6 +135,10 @@ function addData() {
   document.getElementById('type').value = '';
   document.getElementById('capacity').value = '';
   document.getElementById('location').value = '';
+}
+
+function saveToLocal() {
+  localStorage.setItem('assetData', JSON.stringify(assetData));
 }
 
 function renderTable() {
@@ -165,12 +178,14 @@ function editData(index) {
   document.getElementById('latitude').value = item.latitude;
   document.getElementById('longitude').value = item.longitude;
   assetData.splice(index, 1);
+  saveToLocal();
   renderTable();
 }
 
 function deleteData(index) {
   if (confirm('Yakin ingin menghapus data ini?')) {
     assetData.splice(index, 1);
+    saveToLocal();
     renderTable();
   }
 }
@@ -194,8 +209,9 @@ function importExcel(event) {
     const worksheet = workbook.Sheets[sheetName];
     const importedData = XLSX.utils.sheet_to_json(worksheet);
     assetData = assetData.concat(importedData);
+    saveToLocal();
     renderTable();
-    alert('Data berhasil diimpor.');
+    alert('Data berhasil diimpor dan disimpan.');
   };
   reader.readAsArrayBuffer(file);
 }
