@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pencatatan Asset - Save to Excel</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  body { font-family: sans-serif; padding: 10px; }
+  input, button { padding: 5px; margin: 5px; width: 90%; }
+  table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+  td, th { border: 1px solid #ccc; padding: 5px; text-align: left; }
+</style>
+</head>
+<body>
+<h3>Form Pencatatan Asset</h3>
+<input id="asset_number" placeholder="Asset Number">
+<input id="merk" placeholder="Merk">
+<input id="serial_number" placeholder="Serial Number">
+<input id="type" placeholder="Type">
+<input id="capacity" placeholder="Capacity">
+<input id="location" placeholder="Location">
+<input id="latitude" placeholder="Latitude" readonly>
+<input id="longitude" placeholder="Longitude" readonly>
+<button onclick="addData()">Save & Preview</button>
+<button onclick="downloadExcel()">Download Excel</button>
+<input type="file" id="file_input" accept=".xlsx" onchange="importExcel(event)">
+
+<h4>Data Preview</h4>
+<table id="preview_table">
+  <thead>
+    <tr>
+      <th>Asset Number</th>
+      <th>Merk</th>
+      <th>Serial Number</th>
+      <th>Type</th>
+      <th>Capacity</th>
+      <th>Location</th>
+      <th>Latitude</th>
+      <th>Longitude</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody id="table_body"></tbody>
+</table>
+
+<script>
+let assetData = [];
+
+navigator.geolocation.getCurrentPosition(
+  (position) => {
+    document.getElementById('latitude').value = position.coords.latitude;
+    document.getElementById('longitude').value = position.coords.longitude;
+  },
+  (error) => {
+    alert('Gagal mendapatkan lokasi: ' + error.message);
+  },
+  { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+);
+
+function addData() {
+  const asset_number = document.getElementById('asset_number').value;
+  const merk = document.getElementById('merk').value;
+  const serial_number = document.getElementById('serial_number').value;
+  const type = document.getElementById('type').value;
+  const capacity = document.getElementById('capacity').value;
+  const location = document.getElementById('location').value;
+  const latitude = document.getElementById('latitude').value;
+  const longitude = document.getElementById('longitude').value;
+
+  const record = { asset_number, merk, serial_number, type, capacity, location, latitude, longitude };
+  assetData.push(record);
+  renderTable();
+
+  document.getElementById('asset_number').value = '';
+  document.getElementById('merk').value = '';
+  document.getElementById('serial_number').value = '';
+  document.getElementById('type').value = '';
+  document.getElementById('capacity').value = '';
+  document.getElementById('location').value = '';
+}
+
+function renderTable() {
+  const table = document.getElementById('table_body');
+  table.innerHTML = '';
+  assetData.forEach((item, index) => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${item.asset_number}</td>
+      <td>${item.merk}</td>
+      <td>${item.serial_number}</td>
+      <td>${item.type}</td>
+      <td>${item.capacity}</td>
+      <td>${item.location}</td>
+      <td>${item.latitude}</td>
+      <td>${item.longitude}</td>
+      <td>
+        <button onclick="editData(${index})">Edit</button>
+        <button onclick="deleteData(${index})">Delete</button>
+      </td>
+    `;
+    table.appendChild(row);
+  });
+}
+
+function editData(index) {
+  const item = assetData[index];
+  document.getElementById('asset_number').value = item.asset_number;
+  document.getElementById('merk').value = item.merk;
+  document.getElementById('serial_number').value = item.serial_number;
+  document.getElementById('type').value = item.type;
+  document.getElementById('capacity').value = item.capacity;
+  document.getElementById('location').value = item.location;
+  document.getElementById('latitude').value = item.latitude;
+  document.getElementById('longitude').value = item.longitude;
+
+  assetData.splice(index, 1);
+  renderTable();
+}
+
+function deleteData(index) {
+  if (confirm('Yakin ingin menghapus data ini?')) {
+    assetData.splice(index, 1);
+    renderTable();
+  }
+}
+
+function downloadExcel() {
+  let filename = prompt("Masukkan nama file (tanpa .xlsx):", "asset_data");
+  if (!filename) filename = "asset_data";
+
+  const worksheet = XLSX.utils.json_to_sheet(assetData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'AssetData');
+  XLSX.writeFile(workbook, filename + '.xlsx');
+}
+
+function importExcel(event) {
+  const file = event.target.files[0];
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const importedData = XLSX.utils.sheet_to_json(worksheet);
+    assetData = assetData.concat(importedData);
+    renderTable();
+  };
+  reader.readAsArrayBuffer(file);
+}
+</script>
+</body>
+</html>
