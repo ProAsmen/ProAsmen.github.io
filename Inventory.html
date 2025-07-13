@@ -21,9 +21,12 @@
 <input id="capacity" placeholder="Capacity">
 <input id="location" placeholder="Location">
 <input id="latitude" placeholder="Latitude" readonly>
-<input id="longitude" placeholder="Longitude" readonly>
+<input id="longitude" placeholder="Longitude" readonly">
+<br>
 <button onclick="addData()">Save & Preview</button>
 <button onclick="downloadExcel()">Download</button>
+<input type="file" id="file_input" accept=".xlsx" onchange="importExcel(event)">
+<button onclick="refreshGPS()">Refresh GPS</button>
 
 <h4>Filter Data</h4>
 <input id="search_asset_number" placeholder="Filter Asset Number..." onkeyup="filterTable()">
@@ -52,9 +55,12 @@
 
 <script>
 let assetData = [];
+let gpsWatcher;
 
-function updateLocation() {
-  navigator.geolocation.getCurrentPosition(
+// Inisialisasi GPS realtime
+function startGPSWatcher() {
+  if (gpsWatcher) navigator.geolocation.clearWatch(gpsWatcher);
+  gpsWatcher = navigator.geolocation.watchPosition(
     (position) => {
       document.getElementById('latitude').value = position.coords.latitude.toFixed(6);
       document.getElementById('longitude').value = position.coords.longitude.toFixed(6);
@@ -65,8 +71,25 @@ function updateLocation() {
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
 }
-setInterval(updateLocation, 3000);
-updateLocation();
+
+// Tombol refresh GPS manual
+function refreshGPS() {
+  startGPSWatcher();
+  alert("GPS telah diperbarui ulang.");
+}
+startGPSWatcher();
+
+// Navigasi input antar kolom menggunakan panah kiri
+const inputOrder = ['asset_number','merk','serial_number','type','capacity','location'];
+inputOrder.forEach((id, index) => {
+  document.getElementById(id).addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const nextIndex = (index + 1) % inputOrder.length;
+      document.getElementById(inputOrder[nextIndex]).focus();
+    }
+  });
+});
 
 function addData() {
   const asset_number = document.getElementById('asset_number').value;
@@ -86,7 +109,7 @@ function addData() {
 
   const existingIndex = assetData.findIndex(item => item.asset_number === asset_number);
   if (existingIndex !== -1) {
-    if (!confirm("Asset Number sama sudah ada. Yakin ingin overwrite?")) {
+    if (!confirm("Asset Number sudah ada. Yakin ingin overwrite?")) {
       return;
     } else {
       assetData.splice(existingIndex, 1);
@@ -141,7 +164,6 @@ function editData(index) {
   document.getElementById('location').value = item.location;
   document.getElementById('latitude').value = item.latitude;
   document.getElementById('longitude').value = item.longitude;
-
   assetData.splice(index, 1);
   renderTable();
 }
@@ -156,11 +178,26 @@ function deleteData(index) {
 function downloadExcel() {
   let filename = prompt("Masukkan nama file (tanpa .xlsx):", "asset_data");
   if (!filename) filename = "asset_data";
-
   const worksheet = XLSX.utils.json_to_sheet(assetData);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'AssetData');
   XLSX.writeFile(workbook, filename + '.xlsx');
+}
+
+function importExcel(event) {
+  const file = event.target.files[0];
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const importedData = XLSX.utils.sheet_to_json(worksheet);
+    assetData = assetData.concat(importedData);
+    renderTable();
+    alert('Data berhasil diimpor.');
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 function updateCountDisplay(filteredCount) {
