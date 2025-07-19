@@ -204,6 +204,8 @@ function clearAllData() {
 
 function downloadExcel() {
   let filename = prompt("Masukkan nama file (tanpa .xlsx):", "asset_data");
+  if (filename === null) return; // User clicked cancel
+  
   if (!filename) filename = "asset_data";
   const worksheet = XLSX.utils.json_to_sheet(assetData);
   const workbook = XLSX.utils.book_new();
