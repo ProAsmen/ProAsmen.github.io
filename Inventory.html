@@ -167,7 +167,7 @@ function addData() {
     assetData.splice(existingIndex, 1);
   }
 
-  const record = { asset_number, remark, asset_description, merk, serial_number, type, location, latitude, longitude, timestamp };
+  const record = { asset_number, remark, asset_description, location, merk, serial_number, type, latitude, longitude, timestamp };
   assetData.unshift(record); // Add to beginning of array instead of end
   lastAddedIndex = 0;
   saveToLocal();
@@ -301,7 +301,30 @@ function downloadExcel() {
   if (filename === null) return;
   if (!filename) filename = "asset_data";
 
-  const worksheet = XLSX.utils.json_to_sheet(assetData);
+  // Format data for Excel with the correct column order and formatted timestamp
+  const excelData = assetData.map(item => {
+    const date = new Date(item.timestamp);
+    const formattedDate = date.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+    
+    return {
+      'Asset Number': item.asset_number,
+      'Remark': item.remark,
+      'Asset Description': item.asset_description,
+      'Location': item.location,
+      'Merk': item.merk,
+      'Serial Number': item.serial_number,
+      'Type': item.type,
+      'Latitude': item.latitude,
+      'Longitude': item.longitude,
+      'Timestamp': formattedDate
+    };
+  });
+
+  const worksheet = XLSX.utils.json_to_sheet(excelData);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'AssetData');
   XLSX.writeFile(workbook, filename + '.xlsx');
@@ -317,13 +340,27 @@ function importExcel(event) {
     const importedData = XLSX.utils.sheet_to_json(worksheet);
 
     importedData.forEach(newItem => {
-      const existingIndex = assetData.findIndex(item => item.asset_number === newItem.asset_number);
+      // Convert imported data to our format
+      const formattedItem = {
+        asset_number: newItem['Asset Number'],
+        remark: newItem['Remark'] || 'None',
+        asset_description: newItem['Asset Description'] || '',
+        location: newItem['Location'] || '',
+        merk: newItem['Merk'] || '',
+        serial_number: newItem['Serial Number'] || '',
+        type: newItem['Type'] || '',
+        latitude: newItem['Latitude'] || '',
+        longitude: newItem['Longitude'] || '',
+        timestamp: newItem['Timestamp'] ? new Date(newItem['Timestamp']).toISOString().replace('T', ' ').substring(0, 19) : new Date().toISOString().replace('T', ' ').substring(0, 19)
+      };
+
+      const existingIndex = assetData.findIndex(item => item.asset_number === formattedItem.asset_number);
       if (existingIndex !== -1) {
-        if (confirm(`Asset Number ${newItem.asset_number} sudah ada. Overwrite?`)) {
+        if (confirm(`Asset Number ${formattedItem.asset_number} sudah ada. Overwrite?`)) {
           assetData.splice(existingIndex, 1);
         } else return;
       }
-      assetData.unshift(newItem); // Add imported data to the beginning
+      assetData.unshift(formattedItem); // Add imported data to the beginning
     });
 
     saveToLocal();
