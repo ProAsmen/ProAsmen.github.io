@@ -1,21 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pencatatan Asset - Save to Excel</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<style>
-  body { font-family: sans-serif; padding: 10px; }
-  input, button { padding: 5px; margin: 5px; width: 90%; }
-  table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-  td, th { border: 1px solid #ccc; padding: 5px; text-align: left; }
-  button { cursor: pointer; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pencatatan Asset - Save to Excel</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 10px; }
+    input, button { padding: 5px; margin: 5px; width: 90%; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    td, th { border: 1px solid #ccc; padding: 5px; text-align: left; }
+    button { cursor: pointer; }
+  </style>
 </head>
 <body>
 <h3>Form Pencatatan Asset</h3>
 <input id="asset_number" placeholder="Asset Number" type="number">
+<input id="remark" placeholder="Remark">
 <input id="merk" placeholder="Merk">
 <input id="serial_number" placeholder="Serial Number">
 <input id="type" placeholder="Type">
@@ -31,6 +32,7 @@
 
 <h4>Filter Data</h4>
 <input id="search_asset_number" placeholder="Filter Asset Number..." onkeyup="filterTable()">
+<input id="search_remark" placeholder="Filter Remark..." onkeyup="filterTable()">
 <input id="search_date" type="date" onchange="filterTable()">
 
 <h4 id="count_display">Total catatan: 0 | Sesuai filter: 0
@@ -40,7 +42,9 @@
 <table id="preview_table">
   <thead>
     <tr>
+      <th>Action</th>
       <th>Asset Number</th>
+      <th>Remark</th>
       <th>Merk</th>
       <th>Serial Number</th>
       <th>Type</th>
@@ -49,7 +53,6 @@
       <th>Latitude</th>
       <th>Longitude</th>
       <th>Timestamp</th>
-      <th>Action</th>
     </tr>
   </thead>
   <tbody id="table_body"></tbody>
@@ -59,7 +62,6 @@
 let assetData = [];
 let gpsWatcher;
 
-// Load data dari LocalStorage saat pertama kali buka
 if (localStorage.getItem('assetData')) {
   try {
     assetData = JSON.parse(localStorage.getItem('assetData'));
@@ -69,7 +71,6 @@ if (localStorage.getItem('assetData')) {
   }
 }
 
-// GPS Realtime stabil
 function startGPSWatcher() {
   if (gpsWatcher) navigator.geolocation.clearWatch(gpsWatcher);
   gpsWatcher = navigator.geolocation.watchPosition(
@@ -89,8 +90,7 @@ function refreshGPS() {
   alert("GPS diperbarui ulang.");
 }
 
-// Navigasi antar kolom dengan panah kiri
-const inputOrder = ['asset_number','merk','serial_number','type','capacity','location'];
+const inputOrder = ['asset_number','remark','merk','serial_number','type','capacity','location'];
 inputOrder.forEach((id, index) => {
   document.getElementById(id).addEventListener('keydown', (e) => {
     if (e.key === 'ArrowLeft') {
@@ -103,6 +103,7 @@ inputOrder.forEach((id, index) => {
 
 function addData() {
   const asset_number = document.getElementById('asset_number').value || '';
+  const remark = document.getElementById('remark').value || '';
   const merk = document.getElementById('merk').value || '';
   const serial_number = document.getElementById('serial_number').value || '';
   const type = document.getElementById('type').value || '';
@@ -112,24 +113,20 @@ function addData() {
   const longitude = document.getElementById('longitude').value || '';
   const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
-  // Jika asset_number kosong, kita tetap simpan sebagai record kosong
   const existingIndex = asset_number ? assetData.findIndex(item => item.asset_number === asset_number) : -1;
-  
+
   if (existingIndex !== -1) {
-    if (!confirm("Asset Number sudah ada. Yakin ingin overwrite?")) {
-      return;
-    } else {
-      assetData.splice(existingIndex, 1);
-    }
+    if (!confirm("Asset Number sudah ada. Yakin ingin overwrite?")) return;
+    assetData.splice(existingIndex, 1);
   }
 
-  const record = { asset_number, merk, serial_number, type, capacity, location, latitude, longitude, timestamp };
+  const record = { asset_number, remark, merk, serial_number, type, capacity, location, latitude, longitude, timestamp };
   assetData.push(record);
   saveToLocal();
   renderTable();
 
-  // Reset form kecuali GPS
   document.getElementById('asset_number').value = '';
+  document.getElementById('remark').value = '';
   document.getElementById('merk').value = '';
   document.getElementById('serial_number').value = '';
   document.getElementById('type').value = '';
@@ -144,11 +141,16 @@ function saveToLocal() {
 function renderTable() {
   const table = document.getElementById('table_body');
   table.innerHTML = '';
-  
+
   assetData.forEach((item, index) => {
     const row = document.createElement('tr');
     row.innerHTML = `
+      <td>
+        <button onclick="editData(${index})">Edit</button>
+        <button onclick="deleteData(${index})" style="background-color:#e74c3c;color:white;">Delete</button>
+      </td>
       <td>${item.asset_number}</td>
+      <td>${item.remark}</td>
       <td>${item.merk}</td>
       <td>${item.serial_number}</td>
       <td>${item.type}</td>
@@ -157,20 +159,17 @@ function renderTable() {
       <td>${item.latitude}</td>
       <td>${item.longitude}</td>
       <td>${item.timestamp}</td>
-      <td>
-        <button onclick="editData(${index})">Edit</button>
-        <button onclick="deleteData(${index})" style="background-color:#e74c3c;color:white;">Delete</button>
-      </td>
     `;
     table.appendChild(row);
   });
-  
+
   updateCountDisplay(assetData.length);
 }
 
 function editData(index) {
   const item = assetData[index];
   document.getElementById('asset_number').value = item.asset_number;
+  document.getElementById('remark').value = item.remark;
   document.getElementById('merk').value = item.merk;
   document.getElementById('serial_number').value = item.serial_number;
   document.getElementById('type').value = item.type;
@@ -178,7 +177,7 @@ function editData(index) {
   document.getElementById('location').value = item.location;
   document.getElementById('latitude').value = item.latitude;
   document.getElementById('longitude').value = item.longitude;
-  
+
   assetData.splice(index, 1);
   saveToLocal();
   renderTable();
@@ -204,9 +203,9 @@ function clearAllData() {
 
 function downloadExcel() {
   let filename = prompt("Masukkan nama file (tanpa .xlsx):", "asset_data");
-  if (filename === null) return; // User clicked cancel
-  
+  if (filename === null) return;
   if (!filename) filename = "asset_data";
+
   const worksheet = XLSX.utils.json_to_sheet(assetData);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'AssetData');
@@ -219,27 +218,23 @@ function importExcel(event) {
   reader.onload = function(e) {
     const data = new Uint8Array(e.target.result);
     const workbook = XLSX.read(data, { type: 'array' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     const importedData = XLSX.utils.sheet_to_json(worksheet);
-    
-    // Cek duplikat sebelum import
+
     importedData.forEach(newItem => {
       const existingIndex = assetData.findIndex(item => item.asset_number === newItem.asset_number);
       if (existingIndex !== -1) {
         if (confirm(`Asset Number ${newItem.asset_number} sudah ada. Overwrite?`)) {
           assetData.splice(existingIndex, 1);
-        } else {
-          return; // Skip item ini
-        }
+        } else return;
       }
       assetData.push(newItem);
     });
-    
+
     saveToLocal();
     renderTable();
     alert(`Berhasil mengimpor ${importedData.length} data.`);
-    document.getElementById('file_input').value = ''; // Reset input file
+    document.getElementById('file_input').value = '';
   };
   reader.readAsArrayBuffer(file);
 }
@@ -253,41 +248,55 @@ function updateCountDisplay(filteredCount) {
 
 function filterTable() {
   const assetFilter = document.getElementById('search_asset_number').value.trim().toLowerCase();
+  const remarkFilter = document.getElementById('search_remark').value.trim().toLowerCase();
   const dateFilter = document.getElementById('search_date').value;
   let filteredCount = 0;
-  
+
   const tableBody = document.getElementById('table_body');
   tableBody.innerHTML = '';
-  
-  assetData.forEach((item, index) => {
-    const assetNumber = item.asset_number ? item.asset_number.toString().toLowerCase() : '';
-    const timestamp = item.timestamp;
-    const matchAsset = !assetFilter || assetNumber.includes(assetFilter);
-    const matchDate = !dateFilter || timestamp.startsWith(dateFilter);
 
-    if (matchAsset && matchDate) {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${item.asset_number}</td>
-        <td>${item.merk}</td>
-        <td>${item.serial_number}</td>
-        <td>${item.type}</td>
-        <td>${item.capacity}</td>
-        <td>${item.location}</td>
-        <td>${item.latitude}</td>
-        <td>${item.longitude}</td>
-        <td>${item.timestamp}</td>
-        <td>
-          <button onclick="editData(${index})">Edit</button>
-          <button onclick="deleteData(${index})" style="background-color:#e74c3c;color:white;">Delete</button>
-        </td>
-      `;
-      tableBody.appendChild(row);
-      filteredCount++;
-    }
+  const matchingAssets = assetData.filter(item => {
+    const assetNumber = (item.asset_number || '').toString().toLowerCase();
+    const remark = (item.remark || '').toLowerCase();
+    const timestamp = item.timestamp || '';
+    const matchAsset = !assetFilter || assetNumber.includes(assetFilter);
+    const matchRemark = !remarkFilter || remark.includes(remarkFilter);
+    const matchDate = !dateFilter || timestamp.startsWith(dateFilter);
+    return matchAsset && matchRemark && matchDate;
   });
-  
+
+  matchingAssets.forEach((item, index) => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>
+        <button onclick="editData(${index})">Edit</button>
+        <button onclick="deleteData(${index})" style="background-color:#e74c3c;color:white;">Delete</button>
+      </td>
+      <td>${item.asset_number}</td>
+      <td>${item.remark}</td>
+      <td>${item.merk}</td>
+      <td>${item.serial_number}</td>
+      <td>${item.type}</td>
+      <td>${item.capacity}</td>
+      <td>${item.location}</td>
+      <td>${item.latitude}</td>
+      <td>${item.longitude}</td>
+      <td>${item.timestamp}</td>
+    `;
+    tableBody.appendChild(row);
+    filteredCount++;
+  });
+
   updateCountDisplay(filteredCount);
+
+  if (assetFilter) {
+    const found = assetData.some(item => (item.asset_number || '').toString().toLowerCase().includes(assetFilter));
+    if (found) {
+      alert("Data dengan Asset Number tersebut ditemukan.");
+    } else {
+      alert("Data dengan Asset Number tersebut tidak ditemukan.");
+    }
+  }
 }
 </script>
 </body>
