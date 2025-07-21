@@ -31,9 +31,10 @@
 <button onclick="refreshGPS()">Refresh GPS</button>
 
 <h4>Filter Data</h4>
-<input id="search_asset_number" placeholder="Filter Asset Number..." onkeyup="filterTable()">
-<input id="search_remark" placeholder="Filter Remark..." onkeyup="filterTable()">
-<input id="search_date" type="date" onchange="filterTable()">
+<input id="search_asset_number" placeholder="Filter Asset Number...">
+<input id="search_remark" placeholder="Filter Remark...">
+<input id="search_date" type="date">
+<button onclick="applyFilter()">Filter Data</button>
 
 <h4 id="count_display">Total catatan: 0 | Sesuai filter: 0
   <button onclick="clearAllData()" style="background-color:#e74c3c; color:white; padding:4px 8px; font-size:12px; margin-left:10px;">Hapus Semua Data</button>
@@ -246,7 +247,7 @@ function updateCountDisplay(filteredCount) {
     <button onclick="clearAllData()" style="background-color:#e74c3c; color:white; padding:4px 8px; font-size:12px; margin-left:10px;">Hapus Semua Data</button>`;
 }
 
-function filterTable() {
+function applyFilter() {
   const assetFilter = document.getElementById('search_asset_number').value.trim().toLowerCase();
   const remarkFilter = document.getElementById('search_remark').value.trim().toLowerCase();
   const dateFilter = document.getElementById('search_date').value;
@@ -289,13 +290,9 @@ function filterTable() {
 
   updateCountDisplay(filteredCount);
 
-  if (assetFilter) {
-    const found = assetData.some(item => (item.asset_number || '').toString().toLowerCase().includes(assetFilter));
-    if (found) {
-      alert("Data dengan Asset Number tersebut ditemukan.");
-    } else {
-      alert("Data dengan Asset Number tersebut tidak ditemukan.");
-    }
+  // Show notification only if there's an asset number filter and no results
+  if (assetFilter && filteredCount === 0) {
+    alert("Data dengan Asset Number tersebut tidak ditemukan.");
   }
 }
 </script>
