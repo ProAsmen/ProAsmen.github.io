@@ -22,6 +22,7 @@
     .remark-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
     .remark-filter-item { display: flex; align-items: center; background: #f0f0f0; padding: 5px 10px; border-radius: 5px; }
     .select-all-remarks { margin-bottom: 10px; }
+    .highlight-row { background-color: #ffff99 !important; transition: background-color 0.5s ease; }
   </style>
 </head>
 <body>
@@ -96,6 +97,7 @@
 let assetData = [];
 let gpsWatcher;
 let allRemarks = new Set();
+let lastAddedIndex = -1;
 
 // Load data from localStorage
 if (localStorage.getItem('assetData')) {
@@ -132,6 +134,11 @@ function scrollToTop() {
   window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
+function scrollToForm() {
+  const formElement = document.querySelector('h3');
+  formElement.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
 window.onscroll = function() {
   const scrollButton = document.querySelector('.scroll-to-top');
   if (document.body.scrollTop > 20 || document.documentElement.scrollTop > 20) {
@@ -161,7 +168,8 @@ function addData() {
   }
 
   const record = { asset_number, remark, asset_description, merk, serial_number, type, location, latitude, longitude, timestamp };
-  assetData.push(record);
+  assetData.unshift(record); // Add to beginning of array instead of end
+  lastAddedIndex = 0;
   saveToLocal();
   updateRemarkFilters();
   renderTable();
@@ -222,6 +230,10 @@ function renderTable() {
 
   assetData.forEach((item, index) => {
     const row = document.createElement('tr');
+    if (index === lastAddedIndex) {
+      row.classList.add('highlight-row');
+      setTimeout(() => row.classList.remove('highlight-row'), 2000);
+    }
     row.innerHTML = `
       <td>
         <button onclick="editData(${index})">Edit</button>
@@ -261,7 +273,7 @@ function editData(index) {
   updateRemarkFilters();
   renderTable();
   
-  scrollToTop();
+  scrollToForm(); // Scroll to form when editing
 }
 
 function deleteData(index) {
@@ -311,7 +323,7 @@ function importExcel(event) {
           assetData.splice(existingIndex, 1);
         } else return;
       }
-      assetData.push(newItem);
+      assetData.unshift(newItem); // Add imported data to the beginning
     });
 
     saveToLocal();
