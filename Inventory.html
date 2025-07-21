@@ -49,8 +49,11 @@
 
 <h4>Filter Data</h4>
 <div class="search-container">
-  <input id="search_asset_number" placeholder="Filter Asset Number...">
-  <button onclick="filterTable()">Filter</button>
+  <input id="search_asset_number" placeholder="Filter Asset Number..." type="number" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+  <div class="checkbox-container">
+    <input type="checkbox" id="filter_asset_number" onchange="filterTable()">
+    <label for="filter_asset_number">Filter by Asset Number</label>
+  </div>
 </div>
 <div class="checkbox-container">
   <input type="checkbox" id="filter_done" checked onchange="filterTable()">
@@ -60,7 +63,7 @@
   <input type="checkbox" id="filter_remaining" onchange="filterTable()">
   <label for="filter_remaining">Remaining</label>
 </div>
-<button onclick="filterTable()">Refresh Filter Data</button>
+<button onclick="resetFilters()">Reset Filter</button>
 
 <h4 id="count_display">Total catatan: 0 | Sesuai filter: 0
   <button onclick="clearAllData()" style="background-color:#e74c3c; color:white; padding:4px 8px; font-size:12px; margin-left:10px;">Hapus Semua Data</button>
@@ -285,7 +288,8 @@ function updateCountDisplay(filteredCount) {
 }
 
 function filterTable() {
-  const assetFilter = document.getElementById('search_asset_number').value.trim().toLowerCase();
+  const assetFilter = document.getElementById('search_asset_number').value.trim();
+  const filterByAsset = document.getElementById('filter_asset_number').checked;
   const showDone = document.getElementById('filter_done').checked;
   const showRemaining = document.getElementById('filter_remaining').checked;
   let filteredCount = 0;
@@ -294,8 +298,8 @@ function filterTable() {
   tableBody.innerHTML = '';
 
   const matchingAssets = assetData.filter(item => {
-    const assetNumber = (item.asset_number || '').toString().toLowerCase();
-    const matchAsset = !assetFilter || assetNumber.includes(assetFilter);
+    const assetNumber = (item.asset_number || '').toString();
+    const matchAsset = !filterByAsset || !assetFilter || assetNumber.includes(assetFilter);
     const matchRemark = (showDone && item.remark === 'Done') || (showRemaining && item.remark === 'Remaining');
     return matchAsset && matchRemark;
   });
@@ -323,15 +327,14 @@ function filterTable() {
   });
 
   updateCountDisplay(filteredCount);
+}
 
-  if (assetFilter) {
-    const found = assetData.some(item => (item.asset_number || '').toString().toLowerCase().includes(assetFilter));
-    if (found) {
-      alert("Data dengan Asset Number tersebut ditemukan.");
-    } else {
-      alert("Data dengan Asset Number tersebut tidak ditemukan.");
-    }
-  }
+function resetFilters() {
+  document.getElementById('search_asset_number').value = '';
+  document.getElementById('filter_asset_number').checked = false;
+  document.getElementById('filter_done').checked = true;
+  document.getElementById('filter_remaining').checked = false;
+  filterTable();
 }
 </script>
 </body>
