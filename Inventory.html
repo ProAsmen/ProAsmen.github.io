@@ -7,23 +7,37 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     body { font-family: sans-serif; padding: 10px; }
-    input, button { padding: 5px; margin: 5px; width: 90%; }
+    input, button, select { padding: 5px; margin: 5px; width: 90%; }
     table { border-collapse: collapse; width: 100%; margin-top: 10px; }
     td, th { border: 1px solid #ccc; padding: 5px; text-align: left; }
     button { cursor: pointer; }
+    .form-container { display: flex; flex-wrap: wrap; }
+    .form-column { flex: 1; min-width: 300px; }
+    .checkbox-container { display: flex; align-items: center; }
+    .checkbox-container input[type="checkbox"] { width: auto; margin-right: 10px; }
+    .scroll-to-top { position: fixed; bottom: 20px; right: 20px; background-color: #3498db; color: white; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 20px; cursor: pointer; display: none; }
   </style>
 </head>
 <body>
 <h3>Form Pencatatan Asset</h3>
-<input id="asset_number" placeholder="Asset Number" type="number">
-<input id="remark" placeholder="Remark">
-<input id="merk" placeholder="Merk">
-<input id="serial_number" placeholder="Serial Number">
-<input id="type" placeholder="Type">
-<input id="capacity" placeholder="Capacity">
-<input id="location" placeholder="Location">
-<input id="latitude" placeholder="Latitude" readonly>
-<input id="longitude" placeholder="Longitude" readonly>
+<div class="form-container">
+  <div class="form-column">
+    <input id="asset_number" placeholder="Asset Number" type="number">
+    <div class="checkbox-container">
+      <input type="checkbox" id="remark" checked>
+      <label for="remark">Done</label>
+    </div>
+    <input id="asset_description" placeholder="Asset Description">
+    <input id="location" placeholder="Location">
+  </div>
+  <div class="form-column">
+    <input id="merk" placeholder="Merk">
+    <input id="serial_number" placeholder="Serial Number">
+    <input id="type" placeholder="Type">
+    <input id="latitude" placeholder="Latitude" readonly>
+    <input id="longitude" placeholder="Longitude" readonly>
+  </div>
+</div>
 <br>
 <button onclick="addData()">Save & Preview</button>
 <button onclick="downloadExcel()">Download</button>
@@ -31,10 +45,16 @@
 <button onclick="refreshGPS()">Refresh GPS</button>
 
 <h4>Filter Data</h4>
-<input id="search_asset_number" placeholder="Filter Asset Number...">
-<input id="search_remark" placeholder="Filter Remark...">
-<input id="search_date" type="date">
-<button onclick="applyFilter()">Filter Data</button>
+<input id="search_asset_number" placeholder="Filter Asset Number..." onkeyup="filterTable()">
+<div class="checkbox-container">
+  <input type="checkbox" id="filter_done" checked onchange="filterTable()">
+  <label for="filter_done">Done</label>
+</div>
+<div class="checkbox-container">
+  <input type="checkbox" id="filter_remaining" onchange="filterTable()">
+  <label for="filter_remaining">Remaining</label>
+</div>
+<button onclick="filterTable()">Refresh Filter Data</button>
 
 <h4 id="count_display">Total catatan: 0 | Sesuai filter: 0
   <button onclick="clearAllData()" style="background-color:#e74c3c; color:white; padding:4px 8px; font-size:12px; margin-left:10px;">Hapus Semua Data</button>
@@ -46,11 +66,11 @@
       <th>Action</th>
       <th>Asset Number</th>
       <th>Remark</th>
+      <th>Asset Description</th>
+      <th>Location</th>
       <th>Merk</th>
       <th>Serial Number</th>
       <th>Type</th>
-      <th>Capacity</th>
-      <th>Location</th>
       <th>Latitude</th>
       <th>Longitude</th>
       <th>Timestamp</th>
@@ -58,6 +78,8 @@
   </thead>
   <tbody id="table_body"></tbody>
 </table>
+
+<button class="scroll-to-top" onclick="scrollToTop()">↑</button>
 
 <script>
 let assetData = [];
@@ -91,24 +113,26 @@ function refreshGPS() {
   alert("GPS diperbarui ulang.");
 }
 
-const inputOrder = ['asset_number','remark','merk','serial_number','type','capacity','location'];
-inputOrder.forEach((id, index) => {
-  document.getElementById(id).addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      const nextIndex = (index + 1) % inputOrder.length;
-      document.getElementById(inputOrder[nextIndex]).focus();
-    }
-  });
-});
+function scrollToTop() {
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+window.onscroll = function() {
+  const scrollButton = document.querySelector('.scroll-to-top');
+  if (document.body.scrollTop > 20 || document.documentElement.scrollTop > 20) {
+    scrollButton.style.display = "block";
+  } else {
+    scrollButton.style.display = "none";
+  }
+};
 
 function addData() {
   const asset_number = document.getElementById('asset_number').value || '';
-  const remark = document.getElementById('remark').value || '';
+  const remark = document.getElementById('remark').checked ? 'Done' : 'Remaining';
+  const asset_description = document.getElementById('asset_description').value || '';
   const merk = document.getElementById('merk').value || '';
   const serial_number = document.getElementById('serial_number').value || '';
   const type = document.getElementById('type').value || '';
-  const capacity = document.getElementById('capacity').value || '';
   const location = document.getElementById('location').value || '';
   const latitude = document.getElementById('latitude').value || '';
   const longitude = document.getElementById('longitude').value || '';
@@ -121,18 +145,22 @@ function addData() {
     assetData.splice(existingIndex, 1);
   }
 
-  const record = { asset_number, remark, merk, serial_number, type, capacity, location, latitude, longitude, timestamp };
+  const record = { asset_number, remark, asset_description, merk, serial_number, type, location, latitude, longitude, timestamp };
   assetData.push(record);
   saveToLocal();
   renderTable();
 
+  // Clear form except GPS coordinates
   document.getElementById('asset_number').value = '';
-  document.getElementById('remark').value = '';
+  document.getElementById('remark').checked = true;
+  document.getElementById('asset_description').value = '';
   document.getElementById('merk').value = '';
   document.getElementById('serial_number').value = '';
   document.getElementById('type').value = '';
-  document.getElementById('capacity').value = '';
   document.getElementById('location').value = '';
+  
+  // Scroll to top after adding data
+  scrollToTop();
 }
 
 function saveToLocal() {
@@ -152,11 +180,11 @@ function renderTable() {
       </td>
       <td>${item.asset_number}</td>
       <td>${item.remark}</td>
+      <td>${item.asset_description}</td>
+      <td>${item.location}</td>
       <td>${item.merk}</td>
       <td>${item.serial_number}</td>
       <td>${item.type}</td>
-      <td>${item.capacity}</td>
-      <td>${item.location}</td>
       <td>${item.latitude}</td>
       <td>${item.longitude}</td>
       <td>${item.timestamp}</td>
@@ -170,18 +198,21 @@ function renderTable() {
 function editData(index) {
   const item = assetData[index];
   document.getElementById('asset_number').value = item.asset_number;
-  document.getElementById('remark').value = item.remark;
-  document.getElementById('merk').value = item.merk;
-  document.getElementById('serial_number').value = item.serial_number;
-  document.getElementById('type').value = item.type;
-  document.getElementById('capacity').value = item.capacity;
-  document.getElementById('location').value = item.location;
-  document.getElementById('latitude').value = item.latitude;
-  document.getElementById('longitude').value = item.longitude;
+  document.getElementById('remark').checked = item.remark === 'Done';
+  document.getElementById('asset_description').value = item.asset_description || '';
+  document.getElementById('merk').value = item.merk || '';
+  document.getElementById('serial_number').value = item.serial_number || '';
+  document.getElementById('type').value = item.type || '';
+  document.getElementById('location').value = item.location || '';
+  document.getElementById('latitude').value = item.latitude || '';
+  document.getElementById('longitude').value = item.longitude || '';
 
   assetData.splice(index, 1);
   saveToLocal();
   renderTable();
+  
+  // Scroll to form after editing
+  scrollToTop();
 }
 
 function deleteData(index) {
@@ -247,10 +278,10 @@ function updateCountDisplay(filteredCount) {
     <button onclick="clearAllData()" style="background-color:#e74c3c; color:white; padding:4px 8px; font-size:12px; margin-left:10px;">Hapus Semua Data</button>`;
 }
 
-function applyFilter() {
+function filterTable() {
   const assetFilter = document.getElementById('search_asset_number').value.trim().toLowerCase();
-  const remarkFilter = document.getElementById('search_remark').value.trim().toLowerCase();
-  const dateFilter = document.getElementById('search_date').value;
+  const showDone = document.getElementById('filter_done').checked;
+  const showRemaining = document.getElementById('filter_remaining').checked;
   let filteredCount = 0;
 
   const tableBody = document.getElementById('table_body');
@@ -258,28 +289,25 @@ function applyFilter() {
 
   const matchingAssets = assetData.filter(item => {
     const assetNumber = (item.asset_number || '').toString().toLowerCase();
-    const remark = (item.remark || '').toLowerCase();
-    const timestamp = item.timestamp || '';
     const matchAsset = !assetFilter || assetNumber.includes(assetFilter);
-    const matchRemark = !remarkFilter || remark.includes(remarkFilter);
-    const matchDate = !dateFilter || timestamp.startsWith(dateFilter);
-    return matchAsset && matchRemark && matchDate;
+    const matchRemark = (showDone && item.remark === 'Done') || (showRemaining && item.remark === 'Remaining');
+    return matchAsset && matchRemark;
   });
 
   matchingAssets.forEach((item, index) => {
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>
-        <button onclick="editData(${index})">Edit</button>
-        <button onclick="deleteData(${index})" style="background-color:#e74c3c;color:white;">Delete</button>
+        <button onclick="editData(${assetData.findIndex(ai => ai.asset_number === item.asset_number)})">Edit</button>
+        <button onclick="deleteData(${assetData.findIndex(ai => ai.asset_number === item.asset_number)})" style="background-color:#e74c3c;color:white;">Delete</button>
       </td>
       <td>${item.asset_number}</td>
       <td>${item.remark}</td>
+      <td>${item.asset_description}</td>
+      <td>${item.location}</td>
       <td>${item.merk}</td>
       <td>${item.serial_number}</td>
       <td>${item.type}</td>
-      <td>${item.capacity}</td>
-      <td>${item.location}</td>
       <td>${item.latitude}</td>
       <td>${item.longitude}</td>
       <td>${item.timestamp}</td>
@@ -290,9 +318,13 @@ function applyFilter() {
 
   updateCountDisplay(filteredCount);
 
-  // Show notification only if there's an asset number filter and no results
-  if (assetFilter && filteredCount === 0) {
-    alert("Data dengan Asset Number tersebut tidak ditemukan.");
+  if (assetFilter) {
+    const found = assetData.some(item => (item.asset_number || '').toString().toLowerCase().includes(assetFilter));
+    if (found) {
+      alert("Data dengan Asset Number tersebut ditemukan.");
+    } else {
+      alert("Data dengan Asset Number tersebut tidak ditemukan.");
+    }
   }
 }
 </script>
