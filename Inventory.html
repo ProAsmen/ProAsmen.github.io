@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,6 +16,9 @@
     .checkbox-container { display: flex; align-items: center; }
     .checkbox-container input[type="checkbox"] { width: auto; margin-right: 10px; }
     .scroll-to-top { position: fixed; bottom: 20px; right: 20px; background-color: #3498db; color: white; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 20px; cursor: pointer; display: none; }
+    .search-container { display: flex; align-items: center; }
+    .search-container input { flex: 1; margin-right: 5px; }
+    .search-container button { width: auto; padding: 5px 10px; }
   </style>
 </head>
 <body>
@@ -46,7 +48,10 @@
 <button onclick="refreshGPS()">Refresh GPS</button>
 
 <h4>Filter Data</h4>
-<input id="search_asset_number" placeholder="Filter Asset Number..." onkeyup="filterTable()">
+<div class="search-container">
+  <input id="search_asset_number" placeholder="Filter Asset Number...">
+  <button onclick="filterTable()">Filter</button>
+</div>
 <div class="checkbox-container">
   <input type="checkbox" id="filter_done" checked onchange="filterTable()">
   <label for="filter_done">Done</label>
