@@ -19,6 +19,9 @@
     .search-container { display: flex; align-items: center; }
     .search-container input { flex: 1; margin-right: 5px; }
     .search-container button { width: auto; padding: 5px 10px; }
+    .remark-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+    .remark-filter-item { display: flex; align-items: center; background: #f0f0f0; padding: 5px 10px; border-radius: 5px; }
+    .select-all-remarks { margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -26,10 +29,7 @@
 <div class="form-container">
   <div class="form-column">
     <input id="asset_number" placeholder="Asset Number" type="number">
-    <div class="checkbox-container">
-      <input type="checkbox" id="remark" checked>
-      <label for="remark">Done</label>
-    </div>
+    <input id="remark" placeholder="Remark (e.g. Done, Remaining, etc)">
     <input id="asset_description" placeholder="Asset Description">
     <input id="location" placeholder="Location">
   </div>
@@ -55,14 +55,16 @@
     <label for="filter_asset_number">Filter by Asset Number</label>
   </div>
 </div>
-<div class="checkbox-container">
-  <input type="checkbox" id="filter_done" checked onchange="filterTable()">
-  <label for="filter_done">Done</label>
+
+<h5>Filter Remark:</h5>
+<div class="select-all-remarks">
+  <button onclick="selectAllRemarks(true)">Select All</button>
+  <button onclick="selectAllRemarks(false)">Deselect All</button>
 </div>
-<div class="checkbox-container">
-  <input type="checkbox" id="filter_remaining" checked onchange="filterTable()">
-  <label for="filter_remaining">Remaining</label>
+<div class="remark-filters" id="remark_filters">
+  <!-- Remark filters will be generated automatically -->
 </div>
+
 <button onclick="showAllData()">Refresh Filter Data</button>
 
 <h4 id="count_display">Total catatan: 0 | Ditampilkan: 0
@@ -93,11 +95,13 @@
 <script>
 let assetData = [];
 let gpsWatcher;
+let allRemarks = new Set();
 
 // Load data from localStorage
 if (localStorage.getItem('assetData')) {
   try {
     assetData = JSON.parse(localStorage.getItem('assetData'));
+    updateRemarkFilters();
     renderTable();
   } catch (e) {
     console.error("Gagal memuat data dari LocalStorage", e);
@@ -139,7 +143,7 @@ window.onscroll = function() {
 
 function addData() {
   const asset_number = document.getElementById('asset_number').value || '';
-  const remark = document.getElementById('remark').checked ? 'Done' : 'Remaining';
+  const remark = document.getElementById('remark').value || 'None';
   const asset_description = document.getElementById('asset_description').value || '';
   const merk = document.getElementById('merk').value || '';
   const serial_number = document.getElementById('serial_number').value || '';
@@ -159,11 +163,12 @@ function addData() {
   const record = { asset_number, remark, asset_description, merk, serial_number, type, location, latitude, longitude, timestamp };
   assetData.push(record);
   saveToLocal();
+  updateRemarkFilters();
   renderTable();
 
   // Clear form except GPS coordinates
   document.getElementById('asset_number').value = '';
-  document.getElementById('remark').checked = true;
+  document.getElementById('remark').value = '';
   document.getElementById('asset_description').value = '';
   document.getElementById('merk').value = '';
   document.getElementById('serial_number').value = '';
@@ -175,6 +180,40 @@ function addData() {
 
 function saveToLocal() {
   localStorage.setItem('assetData', JSON.stringify(assetData));
+}
+
+function updateRemarkFilters() {
+  // Collect all unique remarks
+  allRemarks = new Set();
+  assetData.forEach(item => {
+    if (item.remark && item.remark.trim() !== '') {
+      allRemarks.add(item.remark);
+    }
+  });
+
+  // Generate filter checkboxes
+  const remarkFiltersContainer = document.getElementById('remark_filters');
+  remarkFiltersContainer.innerHTML = '';
+
+  // Add checkbox for each unique remark
+  allRemarks.forEach(remark => {
+    const filterId = `filter_remark_${remark.replace(/\s+/g, '_')}`;
+    const filterItem = document.createElement('div');
+    filterItem.className = 'remark-filter-item';
+    filterItem.innerHTML = `
+      <input type="checkbox" id="${filterId}" checked onchange="filterTable()">
+      <label for="${filterId}">${remark}</label>
+    `;
+    remarkFiltersContainer.appendChild(filterItem);
+  });
+}
+
+function selectAllRemarks(select) {
+  const checkboxes = document.querySelectorAll('#remark_filters input[type="checkbox"]');
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = select;
+  });
+  filterTable();
 }
 
 function renderTable() {
@@ -208,7 +247,7 @@ function renderTable() {
 function editData(index) {
   const item = assetData[index];
   document.getElementById('asset_number').value = item.asset_number;
-  document.getElementById('remark').checked = item.remark === 'Done';
+  document.getElementById('remark').value = item.remark || '';
   document.getElementById('asset_description').value = item.asset_description || '';
   document.getElementById('merk').value = item.merk || '';
   document.getElementById('serial_number').value = item.serial_number || '';
@@ -219,6 +258,7 @@ function editData(index) {
 
   assetData.splice(index, 1);
   saveToLocal();
+  updateRemarkFilters();
   renderTable();
   
   scrollToTop();
@@ -228,6 +268,7 @@ function deleteData(index) {
   if (confirm('Yakin ingin menghapus data ini?')) {
     assetData.splice(index, 1);
     saveToLocal();
+    updateRemarkFilters();
     renderTable();
     alert('Data berhasil dihapus.');
   }
@@ -237,6 +278,7 @@ function clearAllData() {
   if (confirm('Yakin ingin menghapus semua data yang tersimpan?')) {
     assetData = [];
     saveToLocal();
+    updateRemarkFilters();
     renderTable();
     alert('Semua data telah dihapus.');
   }
@@ -273,6 +315,7 @@ function importExcel(event) {
     });
 
     saveToLocal();
+    updateRemarkFilters();
     renderTable();
     alert(`Berhasil mengimpor ${importedData.length} data.`);
     document.getElementById('file_input').value = '';
@@ -290,9 +333,13 @@ function updateCountDisplay(displayedCount) {
 function filterTable() {
   const assetFilter = document.getElementById('search_asset_number').value.trim();
   const filterByAsset = document.getElementById('filter_asset_number').checked;
-  const showDone = document.getElementById('filter_done').checked;
-  const showRemaining = document.getElementById('filter_remaining').checked;
   let displayedCount = 0;
+
+  // Get selected remarks
+  const selectedRemarks = new Set();
+  document.querySelectorAll('#remark_filters input[type="checkbox"]:checked').forEach(checkbox => {
+    selectedRemarks.add(checkbox.nextElementSibling.textContent);
+  });
 
   const tableBody = document.getElementById('table_body');
   tableBody.innerHTML = '';
@@ -300,7 +347,7 @@ function filterTable() {
   const matchingAssets = assetData.filter(item => {
     const assetNumber = (item.asset_number || '').toString();
     const matchAsset = !filterByAsset || !assetFilter || assetNumber.includes(assetFilter);
-    const matchRemark = (showDone && item.remark === 'Done') || (showRemaining && item.remark === 'Remaining');
+    const matchRemark = selectedRemarks.size === 0 || selectedRemarks.has(item.remark);
     return matchAsset && matchRemark;
   });
 
@@ -330,13 +377,12 @@ function filterTable() {
 }
 
 function showAllData() {
-  // Reset semua filter
+  // Reset all filters
   document.getElementById('search_asset_number').value = '';
   document.getElementById('filter_asset_number').checked = false;
-  document.getElementById('filter_done').checked = true;
-  document.getElementById('filter_remaining').checked = true;
+  selectAllRemarks(true);
   
-  // Tampilkan semua data
+  // Show all data
   renderTable();
 }
 </script>
