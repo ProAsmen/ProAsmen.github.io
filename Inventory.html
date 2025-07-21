@@ -60,12 +60,12 @@
   <label for="filter_done">Done</label>
 </div>
 <div class="checkbox-container">
-  <input type="checkbox" id="filter_remaining" onchange="filterTable()">
+  <input type="checkbox" id="filter_remaining" checked onchange="filterTable()">
   <label for="filter_remaining">Remaining</label>
 </div>
-<button onclick="resetFilters()">Reset Filter</button>
+<button onclick="showAllData()">Refresh Filter Data</button>
 
-<h4 id="count_display">Total catatan: 0 | Sesuai filter: 0
+<h4 id="count_display">Total catatan: 0 | Ditampilkan: 0
   <button onclick="clearAllData()" style="background-color:#e74c3c; color:white; padding:4px 8px; font-size:12px; margin-left:10px;">Hapus Semua Data</button>
 </h4>
 
@@ -94,6 +94,7 @@
 let assetData = [];
 let gpsWatcher;
 
+// Load data from localStorage
 if (localStorage.getItem('assetData')) {
   try {
     assetData = JSON.parse(localStorage.getItem('assetData'));
@@ -117,6 +118,7 @@ function startGPSWatcher() {
   );
 }
 startGPSWatcher();
+
 function refreshGPS() {
   startGPSWatcher();
   alert("GPS diperbarui ulang.");
@@ -168,7 +170,6 @@ function addData() {
   document.getElementById('type').value = '';
   document.getElementById('location').value = '';
   
-  // Scroll to top after adding data
   scrollToTop();
 }
 
@@ -220,7 +221,6 @@ function editData(index) {
   saveToLocal();
   renderTable();
   
-  // Scroll to form after editing
   scrollToTop();
 }
 
@@ -280,10 +280,10 @@ function importExcel(event) {
   reader.readAsArrayBuffer(file);
 }
 
-function updateCountDisplay(filteredCount) {
+function updateCountDisplay(displayedCount) {
   const totalCount = assetData.length;
   document.getElementById('count_display').innerHTML =
-    `Total catatan: ${totalCount} | Sesuai filter: ${filteredCount}
+    `Total catatan: ${totalCount} | Ditampilkan: ${displayedCount}
     <button onclick="clearAllData()" style="background-color:#e74c3c; color:white; padding:4px 8px; font-size:12px; margin-left:10px;">Hapus Semua Data</button>`;
 }
 
@@ -292,7 +292,7 @@ function filterTable() {
   const filterByAsset = document.getElementById('filter_asset_number').checked;
   const showDone = document.getElementById('filter_done').checked;
   const showRemaining = document.getElementById('filter_remaining').checked;
-  let filteredCount = 0;
+  let displayedCount = 0;
 
   const tableBody = document.getElementById('table_body');
   tableBody.innerHTML = '';
@@ -323,18 +323,21 @@ function filterTable() {
       <td>${item.timestamp}</td>
     `;
     tableBody.appendChild(row);
-    filteredCount++;
+    displayedCount++;
   });
 
-  updateCountDisplay(filteredCount);
+  updateCountDisplay(displayedCount);
 }
 
-function resetFilters() {
+function showAllData() {
+  // Reset semua filter
   document.getElementById('search_asset_number').value = '';
   document.getElementById('filter_asset_number').checked = false;
   document.getElementById('filter_done').checked = true;
-  document.getElementById('filter_remaining').checked = false;
-  filterTable();
+  document.getElementById('filter_remaining').checked = true;
+  
+  // Tampilkan semua data
+  renderTable();
 }
 </script>
 </body>
