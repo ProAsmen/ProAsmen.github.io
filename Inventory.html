@@ -21,7 +21,6 @@
     .search-container button { width: auto; padding: 5px 10px; }
     .remark-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
     .remark-filter-item { display: flex; align-items: center; background: #f0f0f0; padding: 5px 10px; border-radius: 5px; }
-    .select-all-remarks { margin-bottom: 10px; }
     .highlight-row { background-color: #ffff99 !important; transition: background-color 0.5s ease; }
   </style>
 </head>
@@ -58,15 +57,10 @@
 </div>
 
 <h5>Filter Remark:</h5>
-<div class="select-all-remarks">
-  <button onclick="selectAllRemarks(true)">Select All</button>
-  <button onclick="selectAllRemarks(false)">Deselect All</button>
-</div>
+<button onclick="showAllData()">Refresh Filter Data</button>
 <div class="remark-filters" id="remark_filters">
   <!-- Remark filters will be generated automatically -->
 </div>
-
-<button onclick="showAllData()">Refresh Filter Data</button>
 
 <h4 id="count_display">Total catatan: 0 | Ditampilkan: 0
   <button onclick="clearAllData()" style="background-color:#e74c3c; color:white; padding:4px 8px; font-size:12px; margin-left:10px;">Hapus Semua Data</button>
@@ -98,6 +92,7 @@ let assetData = [];
 let gpsWatcher;
 let allRemarks = new Set();
 let lastAddedIndex = -1;
+let currentEditIndex = -1;
 
 // Load data from localStorage
 if (localStorage.getItem('assetData')) {
@@ -160,16 +155,25 @@ function addData() {
   const longitude = document.getElementById('longitude').value || '';
   const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
-  const existingIndex = asset_number ? assetData.findIndex(item => item.asset_number === asset_number) : -1;
+  if (currentEditIndex !== -1) {
+    // Overwrite existing data
+    const record = { asset_number, remark, asset_description, merk, serial_number, type, location, latitude, longitude, timestamp };
+    assetData[currentEditIndex] = record;
+    currentEditIndex = -1;
+  } else {
+    // Add new data
+    const existingIndex = asset_number ? assetData.findIndex(item => item.asset_number === asset_number) : -1;
 
-  if (existingIndex !== -1) {
-    if (!confirm("Asset Number sudah ada. Yakin ingin overwrite?")) return;
-    assetData.splice(existingIndex, 1);
+    if (existingIndex !== -1) {
+      if (!confirm("Asset Number sudah ada. Yakin ingin overwrite?")) return;
+      assetData.splice(existingIndex, 1);
+    }
+
+    const record = { asset_number, remark, asset_description, merk, serial_number, type, location, latitude, longitude, timestamp };
+    assetData.unshift(record);
+    lastAddedIndex = 0;
   }
 
-  const record = { asset_number, remark, asset_description, merk, serial_number, type, location, latitude, longitude, timestamp };
-  assetData.unshift(record); // Add to beginning of array instead of end
-  lastAddedIndex = 0;
   saveToLocal();
   updateRemarkFilters();
   renderTable();
@@ -216,14 +220,6 @@ function updateRemarkFilters() {
   });
 }
 
-function selectAllRemarks(select) {
-  const checkboxes = document.querySelectorAll('#remark_filters input[type="checkbox"]');
-  checkboxes.forEach(checkbox => {
-    checkbox.checked = select;
-  });
-  filterTable();
-}
-
 function renderTable() {
   const table = document.getElementById('table_body');
   table.innerHTML = '';
@@ -268,12 +264,8 @@ function editData(index) {
   document.getElementById('latitude').value = item.latitude || '';
   document.getElementById('longitude').value = item.longitude || '';
 
-  assetData.splice(index, 1);
-  saveToLocal();
-  updateRemarkFilters();
-  renderTable();
-  
-  scrollToForm(); // Scroll to form when editing
+  currentEditIndex = index; // Store the index we're editing
+  scrollToForm();
 }
 
 function deleteData(index) {
@@ -323,7 +315,7 @@ function importExcel(event) {
           assetData.splice(existingIndex, 1);
         } else return;
       }
-      assetData.unshift(newItem); // Add imported data to the beginning
+      assetData.unshift(newItem);
     });
 
     saveToLocal();
@@ -392,7 +384,11 @@ function showAllData() {
   // Reset all filters
   document.getElementById('search_asset_number').value = '';
   document.getElementById('filter_asset_number').checked = false;
-  selectAllRemarks(true);
+  
+  // Check all remark filters
+  document.querySelectorAll('#remark_filters input[type="checkbox"]').forEach(checkbox => {
+    checkbox.checked = true;
+  });
   
   // Show all data
   renderTable();
