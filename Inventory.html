@@ -30,7 +30,7 @@
 <div class="form-container">
   <div class="form-column">
     <input id="asset_number" placeholder="Asset Number" type="number">
-    <input id="remark" placeholder="Remark (e.g. Done, Remaining, etc)" value="Done">
+    <input id="remark" placeholder="Remark (e.g. Done, Remaining, etc)">
     <input id="asset_description" placeholder="Asset Description">
     <input id="location" placeholder="Location">
   </div>
@@ -60,6 +60,7 @@
 <h5>Filter Remark:</h5>
 <div class="select-all-remarks">
   <button onclick="selectAllRemarks(true)">Select All</button>
+  <button onclick="selectAllRemarks(false)">Deselect All</button>
 </div>
 <div class="remark-filters" id="remark_filters">
   <!-- Remark filters will be generated automatically -->
@@ -149,7 +150,7 @@ window.onscroll = function() {
 
 function addData() {
   const asset_number = document.getElementById('asset_number').value || '';
-  const remark = document.getElementById('remark').value || 'Done'; // Default to "Done"
+  const remark = document.getElementById('remark').value || 'None';
   const asset_description = document.getElementById('asset_description').value || '';
   const merk = document.getElementById('merk').value || '';
   const serial_number = document.getElementById('serial_number').value || '';
@@ -173,9 +174,9 @@ function addData() {
   updateRemarkFilters();
   renderTable();
 
-  // Clear form except GPS coordinates and remark (reset to "Done")
+  // Clear form except GPS coordinates
   document.getElementById('asset_number').value = '';
-  document.getElementById('remark').value = 'Done';
+  document.getElementById('remark').value = '';
   document.getElementById('asset_description').value = '';
   document.getElementById('merk').value = '';
   document.getElementById('serial_number').value = '';
@@ -258,7 +259,7 @@ function renderTable() {
 function editData(index) {
   const item = assetData[index];
   document.getElementById('asset_number').value = item.asset_number;
-  document.getElementById('remark').value = item.remark || 'Done'; // Default to "Done" when editing
+  document.getElementById('remark').value = "Done"; // Set default remark to "Done"
   document.getElementById('asset_description').value = item.asset_description || '';
   document.getElementById('merk').value = item.merk || '';
   document.getElementById('serial_number').value = item.serial_number || '';
@@ -391,7 +392,7 @@ function showAllData() {
   // Reset all filters
   document.getElementById('search_asset_number').value = '';
   document.getElementById('filter_asset_number').checked = false;
-  selectAllRemarks(false); // Deselect all when refreshing
+  selectAllRemarks(true);
   
   // Show all data
   renderTable();
