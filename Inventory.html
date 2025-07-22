@@ -30,7 +30,7 @@
 <div class="form-container">
   <div class="form-column">
     <input id="asset_number" placeholder="Asset Number" type="number">
-    <input id="remark" placeholder="Remark (e.g. Done, Remaining, etc)">
+    <input id="remark" placeholder="Remark (e.g. Done, Remaining, etc)" value="Done">
     <input id="asset_description" placeholder="Asset Description">
     <input id="location" placeholder="Location">
   </div>
@@ -60,7 +60,6 @@
 <h5>Filter Remark:</h5>
 <div class="select-all-remarks">
   <button onclick="selectAllRemarks(true)">Select All</button>
-  <button onclick="selectAllRemarks(false)">Deselect All</button>
 </div>
 <div class="remark-filters" id="remark_filters">
   <!-- Remark filters will be generated automatically -->
@@ -150,7 +149,7 @@ window.onscroll = function() {
 
 function addData() {
   const asset_number = document.getElementById('asset_number').value || '';
-  const remark = document.getElementById('remark').value || 'None';
+  const remark = document.getElementById('remark').value || 'Done'; // Default to "Done"
   const asset_description = document.getElementById('asset_description').value || '';
   const merk = document.getElementById('merk').value || '';
   const serial_number = document.getElementById('serial_number').value || '';
@@ -167,16 +166,16 @@ function addData() {
     assetData.splice(existingIndex, 1);
   }
 
-  const record = { asset_number, remark, asset_description, location, merk, serial_number, type, latitude, longitude, timestamp };
+  const record = { asset_number, remark, asset_description, merk, serial_number, type, location, latitude, longitude, timestamp };
   assetData.unshift(record); // Add to beginning of array instead of end
   lastAddedIndex = 0;
   saveToLocal();
   updateRemarkFilters();
   renderTable();
 
-  // Clear form except GPS coordinates
+  // Clear form except GPS coordinates and remark (reset to "Done")
   document.getElementById('asset_number').value = '';
-  document.getElementById('remark').value = '';
+  document.getElementById('remark').value = 'Done';
   document.getElementById('asset_description').value = '';
   document.getElementById('merk').value = '';
   document.getElementById('serial_number').value = '';
@@ -259,7 +258,7 @@ function renderTable() {
 function editData(index) {
   const item = assetData[index];
   document.getElementById('asset_number').value = item.asset_number;
-  document.getElementById('remark').value = item.remark || '';
+  document.getElementById('remark').value = item.remark || 'Done'; // Default to "Done" when editing
   document.getElementById('asset_description').value = item.asset_description || '';
   document.getElementById('merk').value = item.merk || '';
   document.getElementById('serial_number').value = item.serial_number || '';
@@ -301,30 +300,7 @@ function downloadExcel() {
   if (filename === null) return;
   if (!filename) filename = "asset_data";
 
-  // Format data for Excel with the correct column order and formatted timestamp
-  const excelData = assetData.map(item => {
-    const date = new Date(item.timestamp);
-    const formattedDate = date.toLocaleDateString('id-ID', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-    
-    return {
-      'Asset Number': item.asset_number,
-      'Remark': item.remark,
-      'Asset Description': item.asset_description,
-      'Location': item.location,
-      'Merk': item.merk,
-      'Serial Number': item.serial_number,
-      'Type': item.type,
-      'Latitude': item.latitude,
-      'Longitude': item.longitude,
-      'Timestamp': formattedDate
-    };
-  });
-
-  const worksheet = XLSX.utils.json_to_sheet(excelData);
+  const worksheet = XLSX.utils.json_to_sheet(assetData);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'AssetData');
   XLSX.writeFile(workbook, filename + '.xlsx');
@@ -340,27 +316,13 @@ function importExcel(event) {
     const importedData = XLSX.utils.sheet_to_json(worksheet);
 
     importedData.forEach(newItem => {
-      // Convert imported data to our format
-      const formattedItem = {
-        asset_number: newItem['Asset Number'],
-        remark: newItem['Remark'] || 'None',
-        asset_description: newItem['Asset Description'] || '',
-        location: newItem['Location'] || '',
-        merk: newItem['Merk'] || '',
-        serial_number: newItem['Serial Number'] || '',
-        type: newItem['Type'] || '',
-        latitude: newItem['Latitude'] || '',
-        longitude: newItem['Longitude'] || '',
-        timestamp: newItem['Timestamp'] ? new Date(newItem['Timestamp']).toISOString().replace('T', ' ').substring(0, 19) : new Date().toISOString().replace('T', ' ').substring(0, 19)
-      };
-
-      const existingIndex = assetData.findIndex(item => item.asset_number === formattedItem.asset_number);
+      const existingIndex = assetData.findIndex(item => item.asset_number === newItem.asset_number);
       if (existingIndex !== -1) {
-        if (confirm(`Asset Number ${formattedItem.asset_number} sudah ada. Overwrite?`)) {
+        if (confirm(`Asset Number ${newItem.asset_number} sudah ada. Overwrite?`)) {
           assetData.splice(existingIndex, 1);
         } else return;
       }
-      assetData.unshift(formattedItem); // Add imported data to the beginning
+      assetData.unshift(newItem); // Add imported data to the beginning
     });
 
     saveToLocal();
@@ -429,7 +391,7 @@ function showAllData() {
   // Reset all filters
   document.getElementById('search_asset_number').value = '';
   document.getElementById('filter_asset_number').checked = false;
-  selectAllRemarks(true);
+  selectAllRemarks(false); // Deselect all when refreshing
   
   // Show all data
   renderTable();
