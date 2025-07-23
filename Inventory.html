@@ -301,27 +301,62 @@ function downloadExcel() {
 
 function importExcel(event) {
   const file = event.target.files[0];
+  if (!file) return;
+
   const reader = new FileReader();
   reader.onload = function(e) {
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: 'array' });
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const importedData = XLSX.utils.sheet_to_json(worksheet);
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const importedData = XLSX.utils.sheet_to_json(worksheet);
 
-    importedData.forEach(newItem => {
-      const existingIndex = assetData.findIndex(item => item.asset_number === newItem.asset_number);
-      if (existingIndex !== -1) {
-        if (confirm(`Asset Number ${newItem.asset_number} sudah ada. Overwrite?`)) {
-          assetData.splice(existingIndex, 1);
-        } else return;
+      if (!importedData || importedData.length === 0) {
+        alert("File Excel tidak berisi data yang valid.");
+        document.getElementById('file_input').value = '';
+        return;
       }
-      assetData.unshift(newItem);
-    });
 
-    saveToLocal();
-    updateRemarkFilters();
-    renderTable();
-    alert(`Berhasil mengimpor ${importedData.length} data.`);
+      let overwriteCount = 0;
+      let addedCount = 0;
+      const duplicateAssetNumbers = [];
+
+      importedData.forEach(newItem => {
+        if (!newItem.asset_number) {
+          console.warn("Skipping item without asset_number:", newItem);
+          return;
+        }
+
+        const existingIndex = assetData.findIndex(item => item.asset_number == newItem.asset_number);
+        if (existingIndex !== -1) {
+          duplicateAssetNumbers.push(newItem.asset_number);
+          overwriteCount++;
+          assetData.splice(existingIndex, 1); // Remove existing item
+        }
+        assetData.unshift(newItem);
+        addedCount++;
+      });
+
+      saveToLocal();
+      updateRemarkFilters();
+      renderTable();
+      
+      // Show summary of import
+      let message = `Berhasil mengimpor ${addedCount} data.`;
+      if (overwriteCount > 0) {
+        message += `\n\n${overwriteCount} data telah di-overwrite (Asset Number: ${duplicateAssetNumbers.join(', ')})`;
+      }
+      alert(message);
+      
+    } catch (error) {
+      console.error("Error importing Excel file:", error);
+      alert("Terjadi kesalahan saat mengimpor file. Pastikan format file benar.");
+    } finally {
+      document.getElementById('file_input').value = '';
+    }
+  };
+  reader.onerror = function() {
+    alert("Gagal membaca file. Silakan coba lagi.");
     document.getElementById('file_input').value = '';
   };
   reader.readAsArrayBuffer(file);
