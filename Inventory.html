@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- Bagian head tetap sama seperti sebelumnya -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Pencatatan Asset - Save to Excel</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
+    /* CSS tetap sama seperti sebelumnya */
     body { font-family: sans-serif; padding: 10px; }
     input, button, select { padding: 5px; margin: 5px; width: 90%; }
     table { border-collapse: collapse; width: 100%; margin-top: 10px; }
@@ -25,6 +27,7 @@
   </style>
 </head>
 <body>
+<!-- Bagian HTML tetap sama seperti sebelumnya -->
 <h3>Form Pencatatan Asset</h3>
 <div class="form-container">
   <div class="form-column">
@@ -293,7 +296,21 @@ function downloadExcel() {
   if (filename === null) return;
   if (!filename) filename = "asset_data";
 
-  const worksheet = XLSX.utils.json_to_sheet(assetData);
+  // Pastikan urutan kolom sesuai dengan yang diharapkan
+  const excelData = assetData.map(item => ({
+    "Asset Number": item.asset_number,
+    "Remark": item.remark,
+    "Asset Description": item.asset_description,
+    "Location": item.location,
+    "Merk": item.merk,
+    "Serial Number": item.serial_number,
+    "Type": item.type,
+    "Latitude": item.latitude,
+    "Longitude": item.longitude,
+    "Timestamp": item.timestamp
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(excelData);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'AssetData');
   XLSX.writeFile(workbook, filename + '.xlsx');
@@ -308,11 +325,66 @@ function importExcel(event) {
     try {
       const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const importedData = XLSX.utils.sheet_to_json(worksheet);
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      
+      // Convert to JSON dengan header yang diharapkan
+      const importedData = XLSX.utils.sheet_to_json(worksheet, {
+        header: [
+          "Asset Number",
+          "Remark",
+          "Asset Description",
+          "Location",
+          "Merk",
+          "Serial Number",
+          "Type",
+          "Latitude",
+          "Longitude",
+          "Timestamp"
+        ],
+        range: 1 // Skip header row jika ada
+      });
 
       if (!importedData || importedData.length === 0) {
-        alert("File Excel tidak berisi data yang valid.");
+        alert("File Excel tidak berisi data yang valid atau format tidak sesuai.");
+        document.getElementById('file_input').value = '';
+        return;
+      }
+
+      // Normalisasi data yang diimpor
+      const normalizedData = importedData.map(row => {
+        // Jika data diimpor sebagai array (tanpa header)
+        if (Array.isArray(row)) {
+          return {
+            asset_number: row[0],
+            remark: row[1] || 'None',
+            asset_description: row[2],
+            location: row[3],
+            merk: row[4],
+            serial_number: row[5],
+            type: row[6],
+            latitude: row[7],
+            longitude: row[8],
+            timestamp: row[9] || new Date().toISOString().replace('T', ' ').substring(0, 19)
+          };
+        }
+        // Jika data diimpor sebagai objek (dengan header)
+        return {
+          asset_number: row['Asset Number'] || row['asset_number'],
+          remark: row['Remark'] || row['remark'] || 'None',
+          asset_description: row['Asset Description'] || row['asset_description'],
+          location: row['Location'] || row['location'],
+          merk: row['Merk'] || row['merk'],
+          serial_number: row['Serial Number'] || row['serial_number'],
+          type: row['Type'] || row['type'],
+          latitude: row['Latitude'] || row['latitude'],
+          longitude: row['Longitude'] || row['longitude'],
+          timestamp: row['Timestamp'] || row['timestamp'] || new Date().toISOString().replace('T', ' ').substring(0, 19)
+        };
+      }).filter(item => item.asset_number !== undefined); // Hapus item tanpa asset_number
+
+      if (normalizedData.length === 0) {
+        alert("Tidak ada data valid yang ditemukan dalam file. Pastikan format file benar.");
         document.getElementById('file_input').value = '';
         return;
       }
@@ -321,19 +393,18 @@ function importExcel(event) {
       let addedCount = 0;
       const duplicateAssetNumbers = [];
 
-      importedData.forEach(newItem => {
-        if (!newItem.asset_number) {
-          console.warn("Skipping item without asset_number:", newItem);
-          return;
-        }
+      normalizedData.forEach(newItem => {
+        const existingIndex = assetData.findIndex(item => 
+          item.asset_number == newItem.asset_number
+        );
 
-        const existingIndex = assetData.findIndex(item => item.asset_number == newItem.asset_number);
         if (existingIndex !== -1) {
           duplicateAssetNumbers.push(newItem.asset_number);
           overwriteCount++;
-          assetData.splice(existingIndex, 1); // Remove existing item
+          assetData.splice(existingIndex, 1); // Hapus data lama
         }
-        assetData.unshift(newItem);
+        
+        assetData.unshift(newItem); // Tambahkan data baru
         addedCount++;
       });
 
@@ -341,7 +412,7 @@ function importExcel(event) {
       updateRemarkFilters();
       renderTable();
       
-      // Show summary of import
+      // Tampilkan notifikasi hasil impor
       let message = `Berhasil mengimpor ${addedCount} data.`;
       if (overwriteCount > 0) {
         message += `\n\n${overwriteCount} data telah di-overwrite (Asset Number: ${duplicateAssetNumbers.join(', ')})`;
@@ -350,15 +421,17 @@ function importExcel(event) {
       
     } catch (error) {
       console.error("Error importing Excel file:", error);
-      alert("Terjadi kesalahan saat mengimpor file. Pastikan format file benar.");
+      alert("Terjadi kesalahan saat mengimpor file. Pastikan format file benar.\n\nDetail: " + error.message);
     } finally {
       document.getElementById('file_input').value = '';
     }
   };
+  
   reader.onerror = function() {
     alert("Gagal membaca file. Silakan coba lagi.");
     document.getElementById('file_input').value = '';
   };
+  
   reader.readAsArrayBuffer(file);
 }
 
